@@ -1,12 +1,4 @@
-/**
- * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
-
-#include <cstdlib>
 #include <cstdio>
-#include <cstring>
 #include "pico/stdlib.h"
 #include "tmc_com.h"
 #include "mg90s.h"
@@ -64,10 +56,11 @@ int main()
 
     // initialize M0
     MyAccelStepper m0(M0_ID, M0_STEP, M0_DIR, M0_EN, M0_DIAG, tmcUart);
+    m0.setStallCallback(gpio_callback);
     MyAccelStepper m1(M1_ID, M1_STEP, M1_DIR, M1_EN, M1_DIAG, tmcUart);
     m1.setStallCallback(gpio_callback);
-
     MyAccelStepper m2(M2_ID, M2_STEP, M2_DIR, M2_EN, M2_DIAG, tmcUart);
+    m2.setStallCallback(gpio_callback);
 
     // initialize SERVO
     MG90S servo(SERVO_PWM);
@@ -93,7 +86,6 @@ int main()
     int currentIdx = 0;
     InputState currentState = InputState::WAITING;
 
-    int i = 0;
     while (true) {
         receiveChar(inputBuffer, 101, &currentIdx, &currentState);
         if (currentState == InputState::LINE_RECEIVED) {
@@ -102,30 +94,27 @@ int main()
             controller.handleInput(inputBuffer);
         }
 
-//        // handle stall guard
-//        // here stallguard triggers outside
-//        // the homing sequence -> bad
+        // handle stall guard
+        // here stallguard triggers outside
+        // the homing sequence -> bad
+        if (m0Stall) {
+            m0Stall = false;
+            m1.stepper.setCurrentPosition(0);
+            m1.stepper.moveTo(0);
+        }
+
         if (m1Stall) {
             m1Stall = false;
             m1.stepper.setCurrentPosition(0);
             m1.stepper.moveTo(0);
         }
 
+        if (m2Stall) {
+            m2Stall = false;
+            m2.stepper.setCurrentPosition(0);
+            m2.stepper.moveTo(0);
+        }
+
         controller.run();
-
-//        if (i >= 50000) {
-//            uint32_t val = tmcUart.readRegister(1, 0x40);
-//            printf("SG -> %lu\n", val);
-//            i = 0;
-//        }
-        i++;
-
-//        if (m1.stepper.isRunning() && i >= 50000) {
-//            uint32_t sgres = m1.tmcComm.getStallGuardResult();
-//            uint32_t tstep = m1.tmcComm.getTstep();
-//            printf("%lu %lu\n", sgres, tstep);
-//            i = 0;
-//        }
-
     }
 }
