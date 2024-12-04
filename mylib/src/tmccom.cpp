@@ -123,24 +123,24 @@ void TmcUart::calcCRC(uint8_t *datagram, uint8_t datagramLength)
 
 void TmcComm::defaultInit() const
 {
-    uint32_t gconf = tmcUart.readRegister(1, TMC2209_GCONF);
+    uint32_t gconf = tmcUart.readRegister(this->motorId, TMC2209_GCONF);
 
     gconf &= ~(1 << 2);  // stealthChop mode
 //    gconf |= 1 << 3;  // direction 1
     gconf &= ~(1 << 3);  // direction 2
     gconf |= 1 << 6;  // disable pdn uart
     gconf |= 1 << 7;  // select microstepping with mres register
-    tmcUart.writeRegister(1, TMC2209_GCONF, gconf);
+    tmcUart.writeRegister(this->motorId, TMC2209_GCONF, gconf);
 
     // set microstepping resolution to 256
-    uint32_t chconf = tmcUart.readRegister(1, TMC2209_CHOPCONF);
+    uint32_t chconf = tmcUart.readRegister(this->motorId, TMC2209_CHOPCONF);
     chconf &= (~(1 << 24) & ~(1 << 25) & ~(1 << 26) & ~(1 << 27));
-    tmcUart.writeRegister(1, TMC2209_CHOPCONF, chconf);
+    tmcUart.writeRegister(this->motorId, TMC2209_CHOPCONF, chconf);
 
     // configure stallguard
-    tmcUart.writeRegister(1, TMC2209_SGTHRS, 100);
-    tmcUart.writeRegister(1, TMC2209_TCOOLTHRS, 220);
-    tmcUart.writeRegister(1, TMC2209_TPWMTHRS, 50);
+    tmcUart.writeRegister(this->motorId, TMC2209_SGTHRS, 100);
+    tmcUart.writeRegister(this->motorId, TMC2209_TCOOLTHRS, 220);
+    tmcUart.writeRegister(this->motorId, TMC2209_TPWMTHRS, 50);
 }
 
 void TmcComm::setStallGuardThreshold(uint8_t sgthrs) const
