@@ -19,6 +19,20 @@ TmcUart::TmcUart()
     this->flush();
 }
 
+TmcUart::TmcUart(uint rx, uint tx, uint uart, uint baudRate)
+    : rxPin(rx),
+      txPin(tx),
+      uart(uart_get_instance(uart)),
+      baudRate(baudRate)
+{
+    uart_init(this->uart, this->baudRate);
+    gpio_set_function(this->rxPin, UART_FUNCSEL_NUM(this->uart, this->rxPin));
+    gpio_set_function(this->txPin, UART_FUNCSEL_NUM(this->uart, this->txPin));
+
+    // flush the uart
+    this->flush();
+}
+
 void TmcUart::flush() const
 {
     while (uart_is_readable(this->uart)) {
@@ -45,11 +59,16 @@ uint8_t TmcUart::writeUart(const uint8_t *data, uint8_t len) const
     }
 
     // read back check (RX TX oneline)
-    char buf[10];
+    uint8_t buf[20];
     for (int i = 0; i < count; i++) {
-        char c = uart_getc(this->uart);
+        uint8_t c = uart_getc(this->uart);
         buf[i] = c;
     }
+
+    if (count != len) {
+        printf("Write err!\n");
+    }
+
     return count;
 }
 
@@ -61,14 +80,14 @@ uint32_t TmcUart::readRegister(uint8_t motorId, uint8_t registerAddress) const
     this->writeUart(datagram, 4);
 
     // we need a little wait for the TMC driver reply
-    sleep_ms(1);
+    sleep_ms(10);
 
     uint8_t buf[8];
     uint8_t readCount = this->readUart(buf, 8);  // read the reply
 //    printf("bytes read: %d\n", readCount);
 
     if (readCount != 8) {
-        printf("Read err.\n");
+        printf("Read err!\n");
     }
 
     // crc check
@@ -76,11 +95,10 @@ uint32_t TmcUart::readRegister(uint8_t motorId, uint8_t registerAddress) const
     TmcUart::calcCRC(buf, 8);
 
     if (recieved_crc != buf[7]) {
-        printf("Bad CRC");
+        printf("Bad CRC!\n");
     }
 
     uint32_t value = buf[6] | buf[5] | buf[4] | buf[3];
-//    uint32_t value = buf[10] | (buf[9] << 8) | (buf[8] << 16) | (buf[7] << 24);
     return value;
 }
 
@@ -95,7 +113,6 @@ void TmcUart::writeRegister(uint8_t motorId, uint8_t registerAddress, uint32_t v
     TmcUart::calcCRC(datagram, 8);
 
     this->writeUart(datagram, 8);
-    uint8_t bufferek[8];
 }
 
 void TmcUart::calcCRC(uint8_t *datagram, uint8_t datagramLength)
@@ -123,28 +140,33 @@ void TmcUart::calcCRC(uint8_t *datagram, uint8_t datagramLength)
 
 void TmcComm::defaultInit() const
 {
-    uint32_t gconf = tmcUart.readRegister(this->motorId, TMC2209_GCONF);
+    uint32_t gconf = this->tmcUart.readRegister(this->motorId, TMC2209_GCONF);
 
     gconf &= ~(1 << 2);  // stealthChop mode
 //    gconf |= 1 << 3;  // direction 1
     gconf &= ~(1 << 3);  // direction 2
     gconf |= 1 << 6;  // disable pdn uart
     gconf |= 1 << 7;  // select microstepping with mres register
-    tmcUart.writeRegister(this->motorId, TMC2209_GCONF, gconf);
+
+    // set nodedelay to 5 * 8 bit times (4)
+    gconf |= 4 << 8;
+
+    this->tmcUart.writeRegister(this->motorId, TMC2209_GCONF, gconf);
 
     // set microstepping resolution to 256
-    uint32_t chconf = tmcUart.readRegister(this->motorId, TMC2209_CHOPCONF);
+    uint32_t chconf = this->tmcUart.readRegister(this->motorId, TMC2209_CHOPCONF);
     chconf &= (~(1 << 24) & ~(1 << 25) & ~(1 << 26) & ~(1 << 27));
-    tmcUart.writeRegister(this->motorId, TMC2209_CHOPCONF, chconf);
+    this->tmcUart.writeRegister(this->motorId, TMC2209_CHOPCONF, chconf);
 
     // configure stallguard
-    tmcUart.writeRegister(this->motorId, TMC2209_SGTHRS, 100);
-    tmcUart.writeRegister(this->motorId, TMC2209_TCOOLTHRS, 220);
-    tmcUart.writeRegister(this->motorId, TMC2209_TPWMTHRS, 50);
+    this->tmcUart.writeRegister(this->motorId, TMC2209_SGTHRS, 100);
+    this->tmcUart.writeRegister(this->motorId, TMC2209_TCOOLTHRS, 220);
+    this->tmcUart.writeRegister(this->motorId, TMC2209_TPWMTHRS, 50);
 }
 
 void TmcComm::setStallGuardThreshold(uint8_t sgthrs) const
 {
+    printf("Setting sgthrs ID = %d\n", this->motorId);
     this->tmcUart.writeRegister(this->motorId, TMC2209_SGTHRS, sgthrs);
 }
 

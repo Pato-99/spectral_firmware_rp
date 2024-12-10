@@ -32,6 +32,7 @@ private:
 
 public:
     TmcUart();
+    TmcUart(uint rx, uint tx, uint uart, uint baudRate);
     void flush() const;
     uint8_t readUart(uint8_t *buf, uint8_t len) const;
     uint8_t writeUart(const uint8_t *data, uint8_t len) const;
